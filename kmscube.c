@@ -66,11 +66,17 @@ static struct {
 	struct gbm_surface *surface;
 } gbm;
 
+struct drm_ops {
+	int (*import)(int fd, uint32_t handle);
+};
+
 static struct {
 	int fd;
 	drmModeModeInfo *mode;
 	uint32_t crtc_id;
 	uint32_t connector_id;
+
+	const struct drm_ops *ops;
 } drm;
 
 struct drm_fb {
@@ -119,6 +125,12 @@ static uint32_t find_crtc_for_connector(const drmModeRes *resources,
 	return -1;
 }
 
+static const struct {
+	const char *driver;
+	const struct drm_ops *ops;
+} drm_driver_ops[] = {
+};
+
 static int init_drm(void)
 {
 	static const char *modules[] = {
@@ -127,6 +139,7 @@ static int init_drm(void)
 	drmModeRes *resources;
 	drmModeConnector *connector = NULL;
 	drmModeEncoder *encoder = NULL;
+	drmVersion *version;
 	int i, area;
 
 	if (!path) {
@@ -149,6 +162,22 @@ static int init_drm(void)
 		printf("could not open drm device\n");
 		return -1;
 	}
+
+	/* query driver version and setup driver-specific hooks */
+	version = drmGetVersion(drm.fd);
+	if (!version) {
+		printf("could not query drm driver version\n");
+		return -1;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(drm_driver_ops); i++) {
+		if (strcmp(drm_driver_ops[i].driver, version->name) == 0) {
+			drm.ops = drm_driver_ops[i].ops;
+			break;
+		}
+	}
+
+	drmFreeVersion(version);
 
 	resources = drmModeGetResources(drm.fd);
 	if (!resources) {
@@ -636,6 +665,16 @@ static struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
 		}
 
 		close(fd);
+
+		if (drm.ops && drm.ops->import) {
+			ret = drm.ops->import(drm.fd, handle);
+			if (ret < 0) {
+				printf("failed to import handle: %s\n",
+				       strerror(-ret));
+				free(fb);
+				return NULL;
+			}
+		}
 	}
 
 	ret = drmModeAddFB(drm.fd, width, height, 24, 32, stride, handle, &fb->fb_id);
