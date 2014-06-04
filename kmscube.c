@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -624,6 +625,7 @@ int main(int argc, char *argv[])
 		.version = DRM_EVENT_CONTEXT_VERSION,
 		.page_flip_handler = page_flip_handler,
 	};
+	bool done = false;
 	struct gbm_bo *bo;
 	struct drm_fb *fb;
 	uint32_t i = 0;
@@ -662,7 +664,7 @@ int main(int argc, char *argv[])
 		return ret;
 	}
 
-	while (1) {
+	while (!done) {
 		struct gbm_bo *next_bo;
 		int waiting_for_flip = 1;
 
@@ -698,6 +700,7 @@ int main(int argc, char *argv[])
 				return -1;
 			} else if (FD_ISSET(0, &fds)) {
 				printf("user interrupted!\n");
+				done = true;
 				break;
 			}
 			drmHandleEvent(drm.fd, &evctx);
