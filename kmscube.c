@@ -120,7 +120,7 @@ static uint32_t find_crtc_for_connector(const drmModeRes *resources,
 static int init_drm(void)
 {
 	static const char *modules[] = {
-			"i915", "radeon", "nouveau", "vmwgfx", "omapdrm", "exynos", "msm", "tegra", "virtio_gpu"
+		"i915", "radeon", "nouveau", "vmwgfx", "omapdrm", "exynos", "msm", "tegra", "virtio_gpu"
 	};
 	drmModeRes *resources;
 	drmModeConnector *connector = NULL;
@@ -621,8 +621,8 @@ int main(int argc, char *argv[])
 {
 	fd_set fds;
 	drmEventContext evctx = {
-			.version = DRM_EVENT_CONTEXT_VERSION,
-			.page_flip_handler = page_flip_handler,
+		.version = DRM_EVENT_CONTEXT_VERSION,
+		.page_flip_handler = page_flip_handler,
 	};
 	struct gbm_bo *bo;
 	struct drm_fb *fb;
