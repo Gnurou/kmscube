@@ -24,6 +24,10 @@
 
 /* Based on a egl cube test app originally written by Arvin Schnell */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -45,6 +49,9 @@
 
 #include "esUtil.h"
 
+#ifdef HAVE_TEGRA
+#include <tegra_drm.h>
+#endif
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -125,10 +132,38 @@ static uint32_t find_crtc_for_connector(const drmModeRes *resources,
 	return -1;
 }
 
+#ifdef HAVE_TEGRA
+static int drm_tegra_import(int fd, uint32_t handle)
+{
+	struct drm_tegra_gem_set_tiling args;
+	int err;
+
+	memset(&args, 0, sizeof(args));
+	args.handle = handle;
+	args.mode = DRM_TEGRA_GEM_TILING_MODE_BLOCK;
+	args.value = 4;
+
+	err = ioctl(drm.fd, DRM_IOCTL_TEGRA_GEM_SET_TILING, &args);
+	if (err < 0) {
+		printf("failed to set tiling parameters: %m\n");
+		return -errno;
+	}
+
+	return 0;
+}
+
+static const struct drm_ops drm_tegra_ops = {
+	.import = drm_tegra_import,
+};
+#endif
+
 static const struct {
 	const char *driver;
 	const struct drm_ops *ops;
 } drm_driver_ops[] = {
+#ifdef HAVE_TEGRA
+	{ "tegra", &drm_tegra_ops },
+#endif
 };
 
 static int init_drm(void)
