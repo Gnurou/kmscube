@@ -744,6 +744,7 @@ int main(int argc, char *argv[])
 		 * hw composition
 		 */
 
+		glFinish();
 		ret = drmModePageFlip(drm.fd, drm.crtc_id, fb->fb_id,
 				DRM_MODE_PAGE_FLIP_EVENT, &waiting_for_flip);
 		if (ret) {
