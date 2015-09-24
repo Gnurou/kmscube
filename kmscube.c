@@ -68,7 +68,6 @@ static struct {
 } gl;
 
 static struct {
-	int fd;
 	struct gbm_device *dev;
 	struct gbm_surface *surface;
 } gbm;
@@ -287,19 +286,21 @@ static int init_drm(void)
 
 static int init_gbm(const char *path)
 {
+	int fd;
+
 	if (path) {
 		printf("opening %s for gbm\n", path);
 
-		gbm.fd = open(path, O_RDWR);
-		if (gbm.fd < 0) {
+		fd = open(path, O_RDWR);
+		if (fd < 0) {
 			fprintf(stderr, "could not open gbm device\n");
 			return -1;
 		}
 	} else {
-		gbm.fd = drm.fd;
+		fd = drm.fd;
 	}
 
-	gbm.dev = gbm_create_device(gbm.fd);
+	gbm.dev = gbm_create_device(fd);
 
 	gbm.surface = gbm_surface_create(gbm.dev,
 			drm.mode->hdisplay, drm.mode->vdisplay,
@@ -667,6 +668,8 @@ drm_fb_destroy_callback(struct gbm_bo *bo, void *data)
 static struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
 {
 	struct drm_fb *fb = gbm_bo_get_user_data(bo);
+	struct gbm_device *gbm = gbm_bo_get_device(bo);
+	int gbmfd = gbm_device_get_fd(gbm);
 	uint32_t width, height, stride, handle;
 	int ret;
 
@@ -681,10 +684,10 @@ static struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
 	stride = gbm_bo_get_stride(bo);
 	handle = gbm_bo_get_handle(bo).u32;
 
-	if (drm.fd != gbm.fd) {
+	if (drm.fd != gbmfd) {
 		int fd;
 
-		ret = drmPrimeHandleToFD(gbm.fd, handle, 0, &fd);
+		ret = drmPrimeHandleToFD(gbmfd, handle, 0, &fd);
 		if (ret) {
 			printf("failed to export bo: %m\n");
 			free(fb);
