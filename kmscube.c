@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <xf86drm.h>
 #include <xf86drmMode.h>
@@ -66,6 +67,7 @@ static struct {
 
 static struct {
 	int fd;
+	int gbm_fd;
 	drmModeModeInfo *mode;
 	uint32_t crtc_id;
 	uint32_t connector_id;
@@ -214,9 +216,36 @@ static int init_drm(void)
 	return 0;
 }
 
+static struct gbm_device *gbm_open_from_render_node(void)
+{
+	int i;
+
+	/* TODO make this a global static array? */
+	static const char *modules[] = {
+			"i915", "radeon", "nouveau", "vmwgfx", "omapdrm", "exynos", "msm", "tegra", "virtio_gpu"
+	};
+
+	for (i = 0; i < ARRAY_SIZE(modules); i++) {
+		printf("trying to load module %s for GBM...", modules[i]);
+		drm.gbm_fd = drmOpenWithType(modules[i], NULL, DRM_NODE_RENDER);
+		if (drm.gbm_fd < 0) {
+			printf("failed.\n");
+		} else {
+			printf("success.\n");
+			break;
+		}
+	}
+
+	return gbm_create_device(drm.gbm_fd);
+}
+
 static int init_gbm(void)
 {
 	gbm.dev = gbm_create_device(drm.fd);
+	if (gbm.dev == NULL)
+		gbm.dev = gbm_open_from_render_node();
+	else
+		drm.gbm_fd = drm.fd;
 
 	gbm.surface = gbm_surface_create(gbm.dev,
 			drm.mode->hdisplay, drm.mode->vdisplay,
@@ -581,6 +610,21 @@ drm_fb_destroy_callback(struct gbm_bo *bo, void *data)
 	free(fb);
 }
 
+static int drm_prime_share_buffer(uint32_t *handle)
+{
+	int fd;
+	int ret;
+
+	ret = drmPrimeHandleToFD(drm.gbm_fd, *handle, 0, &fd);
+	if (ret)
+		return ret;
+
+	ret = drmPrimeFDToHandle(drm.fd, fd, handle);
+
+	close(fd);
+	return ret;
+}
+
 static struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
 {
 	struct drm_fb *fb = gbm_bo_get_user_data(bo);
@@ -597,6 +641,15 @@ static struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
 	height = gbm_bo_get_height(bo);
 	stride = gbm_bo_get_stride(bo);
 	handle = gbm_bo_get_handle(bo).u32;
+
+	if (drm.fd != drm.gbm_fd) {
+		ret = drm_prime_share_buffer(&handles[0]);
+		if (ret) {
+			printf("failed to share buffer using PRIME: %s\n", strerror(errno));
+			free(fb);
+			return NULL;
+		}
+	}
 
 	ret = drmModeAddFB(drm.fd, width, height, 24, 32, stride, handle, &fb->fb_id);
 	if (ret) {
@@ -707,6 +760,11 @@ int main(int argc, char *argv[])
 		gbm_surface_release_buffer(gbm.surface, bo);
 		bo = next_bo;
 	}
+
+	if (drm.gbm_fd)
+		drmClose(drm.gbm_fd);
+
+	drmClose(drm.fd);
 
 	return ret;
 }
