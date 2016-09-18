@@ -35,6 +35,8 @@
 
 #include <xf86drm.h>
 #include <xf86drmMode.h>
+#include <drm_mode.h>
+#include <drm_fourcc.h>
 #include <gbm.h>
 
 #define GL_GLEXT_PROTOTYPES 1
@@ -628,7 +630,9 @@ static int drm_prime_share_buffer(uint32_t *handle)
 static struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
 {
 	struct drm_fb *fb = gbm_bo_get_user_data(bo);
-	uint32_t width, height, stride, handle;
+	uint32_t width, height;
+	uint32_t handles[4] = { 0 }, pitches[4] = { 0 }, offsets[4] = { 0 };
+	uint64_t modifier[4] = { 0 };
 	int ret;
 
 	if (fb)
@@ -639,8 +643,9 @@ static struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
 
 	width = gbm_bo_get_width(bo);
 	height = gbm_bo_get_height(bo);
-	stride = gbm_bo_get_stride(bo);
-	handle = gbm_bo_get_handle(bo).u32;
+	pitches[0] = gbm_bo_get_stride(bo);
+	handles[0] = gbm_bo_get_handle(bo).u32;
+	modifier[0] = NV_FORMAT_MOD_TEGRA_BLOCK(4);
 
 	if (drm.fd != drm.gbm_fd) {
 		ret = drm_prime_share_buffer(&handles[0]);
@@ -651,7 +656,9 @@ static struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
 		}
 	}
 
-	ret = drmModeAddFB(drm.fd, width, height, 24, 32, stride, handle, &fb->fb_id);
+	ret = drmModeAddFB2WithModifiers(drm.fd, width, height,
+		DRM_FORMAT_XRGB8888, handles, pitches, offsets, modifier,
+		&fb->fb_id, DRM_MODE_FB_MODIFIERS);
 	if (ret) {
 		printf("failed to create fb: %s\n", strerror(errno));
 		free(fb);
