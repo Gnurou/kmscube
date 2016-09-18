@@ -736,7 +736,6 @@ static void page_flip_handler(int fd, unsigned int frame,
 
 int main(int argc, char *argv[])
 {
-	fd_set fds;
 	drmEventContext evctx = {
 		.version = DRM_EVENT_CONTEXT_VERSION,
 		.page_flip_handler = page_flip_handler,
@@ -815,6 +814,8 @@ int main(int argc, char *argv[])
 		}
 
 		while (waiting_for_flip) {
+			fd_set fds;
+
 			FD_ZERO(&fds);
 			FD_SET(0, &fds);
 			FD_SET(drm.fd, &fds);
