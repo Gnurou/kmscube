@@ -120,7 +120,7 @@ static uint32_t find_crtc_for_connector(const drmModeRes *resources,
 static int init_drm(void)
 {
 	static const char *modules[] = {
-			"i915", "radeon", "nouveau", "vmwgfx", "omapdrm", "exynos", "msm", "tegra", "virtio_gpu"
+			"i915", "radeon", "tegra", "nouveau", "vmwgfx", "omapdrm", "exynos", "msm", "virtio_gpu"
 	};
 	drmModeRes *resources;
 	drmModeConnector *connector = NULL;
