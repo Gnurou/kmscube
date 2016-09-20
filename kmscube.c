@@ -244,6 +244,7 @@ static struct gbm_device *gbm_open_from_render_node(void)
 static int init_gbm(void)
 {
 	gbm.dev = gbm_create_device(drm.fd);
+	gbm.dev = NULL;
 	if (gbm.dev == NULL)
 		gbm.dev = gbm_open_from_render_node();
 	else
